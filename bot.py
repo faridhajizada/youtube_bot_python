@@ -1,3 +1,4 @@
+# TOKEN = "7089049710:AAE1Fm2rJeOLFHS1W1rvjPhcQZpG3on6KV4"
 import os
 import yt_dlp
 import nest_asyncio
@@ -9,6 +10,15 @@ nest_asyncio.apply()
 
 # Замените 'YOUR_TELEGRAM_BOT_TOKEN' на ваш токен
 TOKEN = "7089049710:AAE1Fm2rJeOLFHS1W1rvjPhcQZpG3on6KV4"
+
+def format_file_size(size):
+    """Функция для форматирования размера файла в человекочитаемый вид (KB или MB)."""
+    if size < 1024:
+        return f"{size} Б"
+    elif size < 1048576:  # 1024 * 1024
+        return f"{size / 1024:.2f} КБ"
+    else:
+        return f"{size / 1048576:.2f} МБ"
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     await update.message.reply_text("Привет! Пожалуйста, отправьте ссылку на видео с YouTube.")
@@ -33,13 +43,17 @@ async def download_video(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
                 duration = info_dict['duration']
                 publish_date = info_dict['upload_date']
                 filesize = info_dict.get('filesize', 'N/A')
+                channel_icon_url = info_dict.get('uploader_url', '') + '/favicon.ico'  # URL иконки канала
+
+                # Форматируем размер файла
+                formatted_filesize = format_file_size(filesize) if isinstance(filesize, int) else 'N/A'
 
                 # Информируем пользователя о видео
                 await update.message.reply_text(
                     f"**Название:** {title}\n"
                     f"**Длина видео:** {duration // 60} мин {duration % 60} сек\n"
-                    f"**Дата публикации:** {publish_date}\n"
-                    f"**Размер файла:** {filesize}\n"
+                    # f"**Дата публикации:** {publish_date}\n"
+                    f"**Размер файла:** {formatted_filesize}\n"
                     "Начинаю загрузку аудио в формате MP3..."
                 )
 
@@ -66,7 +80,20 @@ async def download_video(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
                     await update.message.reply_text("Аудио загружено! Отправляю файл...")
                     # Получаем имя файла
                     file_name = f"./downloads/{title}.mp3"
-                    await context.bot.send_audio(chat_id=update.message.chat.id, audio=open(file_name, 'rb'))
+
+                    # Сначала отправляем изображение канала
+                    await context.bot.send_photo(
+                        chat_id=update.message.chat.id,
+                        photo=channel_icon_url,
+                        caption=f"Иконка канала: {info_dict['uploader']}"
+                    )
+
+                    # Затем отправляем аудио
+                    await context.bot.send_audio(
+                        chat_id=update.message.chat.id,
+                        audio=open(file_name, 'rb'),
+                        # caption=title
+                    )
             except Exception as e:
                 await update.message.reply_text(f"Произошла ошибка: {str(e)}")
     else:
